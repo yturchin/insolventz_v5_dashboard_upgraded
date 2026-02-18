@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
@@ -12,6 +13,21 @@ from app.db.models import Transaction, RuleEvaluation, Notice
 DECISION_HIGH = "HIT"
 DECISION_REVIEW = "NEEDS_REVIEW"
 DECISION_LOW = "NO_HIT"
+
+
+def _as_date(value: Any) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _counterparty_expr():
@@ -51,25 +67,29 @@ def kpis(db: Session, case_id: str) -> Dict[str, Any]:
         func.max(Transaction.booking_date),
     ).filter(Transaction.case_id == case_id).one()
 
+    min_dt = _as_date(min_date)
+    max_dt = _as_date(max_date)
+
     coverage = {
-        "min_date": min_date.isoformat() if min_date else None,
-        "max_date": max_date.isoformat() if max_date else None,
+        "min_date": min_dt.isoformat() if min_dt else None,
+        "max_date": max_dt.isoformat() if max_dt else None,
         "span_days": 0,
         "covered_days": 0,
         "missing_days": 0,
         "longest_gap_days": 0,
     }
 
-    if min_date and max_date:
-        span_days = int((max_date - min_date).days) + 1
+    if min_dt and max_dt:
+        span_days = int((max_dt - min_dt).days) + 1
         # distinct booking days
         covered_days = db.query(func.count(func.distinct(Transaction.booking_date)))\
             .filter(Transaction.case_id == case_id).scalar() or 0
 
         # gaps between consecutive distinct dates
-        dates = [r[0] for r in db.query(func.distinct(Transaction.booking_date))\
+        dates = [_as_date(r[0]) for r in db.query(func.distinct(Transaction.booking_date))\
             .filter(Transaction.case_id == case_id)\
             .order_by(Transaction.booking_date.asc()).all()]
+        dates = [d for d in dates if d is not None]
         longest_gap = 0
         missing = 0
         for a, b in zip(dates, dates[1:]):
@@ -168,9 +188,10 @@ def high_risk_transactions(db: Session, case_id: str, limit: int = 25) -> List[D
 
     out = []
     for tid, d, amt, cpn, rule_id, decision, conf in rows:
+        row_date = _as_date(d)
         out.append({
             "transaction_id": int(tid),
-            "date": d.isoformat() if d else None,
+            "date": row_date.isoformat() if row_date else None,
             "amount": float(amt),
             "counterparty": cpn or "Unknown",
             "rule_id": rule_id,
