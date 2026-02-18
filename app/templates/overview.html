@@ -12,7 +12,9 @@
         <label for="case_id" class="subtle">Case</label>
         <select name="case_id" id="case_id" onchange="this.form.submit()">
           {% for c in cases %}
-            <option value="{{ c.case_id }}" {% if c.case_id == selected_case_id %}selected{% endif %}>{{ c.case_id }} — {{ c.company_name }}</option>
+            <option value="{{ c.case_id }}" {% if c.case_id == selected_case_id %}selected{% endif %}>
+              {{ c.case_id }} — {{ c.company_name }}
+            </option>
           {% endfor %}
         </select>
       </form>
@@ -66,7 +68,6 @@
         <div class="progress">
           <div class="progress-bar" id="lcProgress" style="width:0%"></div>
         </div>
-        <div class="subtle" style="margin-top:8px;">Manage notices in <a href="/notices">Notices</a>.</div>
       </div>
     </div>
   </div>
@@ -94,17 +95,17 @@
           <tbody></tbody>
         </table>
       </div>
-      <div class="subtle" style="margin-top:8px;">Review all in <a href="/rules">Rules</a>.</div>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const fmtEUR = (v) => {
   try { return new Intl.NumberFormat(undefined,{style:'currency',currency:'EUR'}).format(v); }
   catch(e){ return (v||0).toFixed(2) + " EUR"; }
 };
+
+let cashflowChart, riskChart, susTrendChart, cpChart;
 
 function setRiskColor(cardEl, ratio){
   cardEl.classList.remove('risk-low','risk-med','risk-high');
@@ -116,10 +117,7 @@ function setRiskColor(cardEl, ratio){
 async function loadDashboard(){
   const caseId = "{{ selected_case_id }}";
   const res = await fetch(`/api/dashboard/${caseId}`);
-  if(!res.ok){
-    console.error("Dashboard API error", res.status);
-    return;
-  }
+  if(!res.ok) return;
   const data = await res.json();
 
   const k = data.kpis;
@@ -140,76 +138,81 @@ async function loadDashboard(){
   const suspiciousRatio = (k.suspicious_amount || 0) / denom;
   setRiskColor(document.getElementById('kpiSuspiciousCard'), suspiciousRatio);
 
-  // Monthly cashflow
-  const months = (data.monthly_cashflow || []).map(x => x.month);
-  const inflows = (data.monthly_cashflow || []).map(x => x.inflows);
-  const outflows = (data.monthly_cashflow || []).map(x => x.outflows);
+  if (cashflowChart) cashflowChart.destroy();
+  if (riskChart) riskChart.destroy();
+  if (susTrendChart) susTrendChart.destroy();
+  if (cpChart) cpChart.destroy();
 
-  new Chart(document.getElementById('cashflowChart'), {
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false
+  };
+
+  cashflowChart = new Chart(document.getElementById('cashflowChart'), {
     type: 'bar',
     data: {
-      labels: months,
+      labels: data.monthly_cashflow.map(x => x.month),
       datasets: [
-        { label: 'Inflows', data: inflows },
-        { label: 'Outflows', data: outflows }
+        { label: 'Inflows', data: data.monthly_cashflow.map(x => x.inflows) },
+        { label: 'Outflows', data: data.monthly_cashflow.map(x => x.outflows) }
       ]
     },
-    options: { responsive: true, maintainAspectRatio: false }
+    options: chartOptions
   });
 
-  // Risk distribution
-  const r = data.risk_distribution || {};
-  new Chart(document.getElementById('riskChart'), {
+  riskChart = new Chart(document.getElementById('riskChart'), {
     type: 'pie',
     data: {
       labels: ['LOW','REVIEW','HIGH'],
-      datasets: [{ data: [r.LOW||0, r.REVIEW||0, r.HIGH||0] }]
+      datasets: [{
+        data: [
+          data.risk_distribution.LOW||0,
+          data.risk_distribution.REVIEW||0,
+          data.risk_distribution.HIGH||0
+        ]
+      }]
     },
-    options: { responsive: true, maintainAspectRatio: false }
+    options: chartOptions
   });
 
-  // Suspicious trend
-  const sm = (data.suspicious_trend || []).map(x => x.month);
-  const sa = (data.suspicious_trend || []).map(x => x.amount);
-  new Chart(document.getElementById('susTrendChart'), {
+  susTrendChart = new Chart(document.getElementById('susTrendChart'), {
     type: 'line',
-    data: { labels: sm, datasets: [{ label: 'Suspicious amount', data: sa }] },
-    options: { responsive: true, maintainAspectRatio: false }
+    data: {
+      labels: data.suspicious_trend.map(x => x.month),
+      datasets: [{ label: 'Suspicious amount', data: data.suspicious_trend.map(x => x.amount) }]
+    },
+    options: chartOptions
   });
 
-  // Counterparties
-  const cps = data.top_counterparties || [];
-  new Chart(document.getElementById('cpChart'), {
+  cpChart = new Chart(document.getElementById('cpChart'), {
     type: 'bar',
     data: {
-      labels: cps.map(x => x.counterparty),
-      datasets: [{ label: 'Volume', data: cps.map(x => x.volume) }]
+      labels: data.top_counterparties.map(x => x.counterparty),
+      datasets: [{ label: 'Volume', data: data.top_counterparties.map(x => x.volume) }]
     },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' }
+    options: { ...chartOptions, indexAxis: 'y' }
   });
 
-  // Lifecycle
   const lc = data.notice_lifecycle || {};
-  document.getElementById('lcDraft').innerText = lc.Draft || 0;
-  document.getElementById('lcGenerated').innerText = lc.Generated || 0;
-  document.getElementById('lcAccepted').innerText = lc.Accepted || 0;
-  document.getElementById('lcSent').innerText = lc.Sent || 0;
+  document.getElementById('lcDraft').innerText = lc.Draft||0;
+  document.getElementById('lcGenerated').innerText = lc.Generated||0;
+  document.getElementById('lcAccepted').innerText = lc.Accepted||0;
+  document.getElementById('lcSent').innerText = lc.Sent||0;
   const total = (lc.Draft||0)+(lc.Generated||0)+(lc.Accepted||0)+(lc.Sent||0);
   const done = (lc.Sent||0);
-  const pct = total ? (done/total*100) : 0;
-  document.getElementById('lcProgress').style.width = pct.toFixed(0) + '%';
+  document.getElementById('lcProgress').style.width = (total ? (done/total*100) : 0).toFixed(0)+'%';
 
-  // High risk table
   const tbody = document.querySelector('#riskTable tbody');
   tbody.innerHTML = '';
   (data.high_risk || []).forEach(row => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${row.date || ''}</td>
-      <td>${row.counterparty || ''}</td>
+      <td>${row.date||''}</td>
+      <td>${row.counterparty||''}</td>
       <td class="num">${fmtEUR(Math.abs(row.amount||0))}</td>
-      <td>${row.rule_id || ''}</td>
-      <td><span class="pill ${row.severity==='HIGH'?'pill-high':'pill-med'}">${row.severity}</span></td>
+      <td>${row.rule_id||''}</td>
+      <td>${row.severity||''}</td>
       <td class="num">${(row.confidence||0).toFixed(2)}</td>
       <td><a class="btn-sm" href="/notices">Create notice</a></td>
     `;
@@ -219,38 +222,4 @@ async function loadDashboard(){
 
 loadDashboard();
 </script>
-
-<style>
-.page{max-width:1200px;margin:0 auto;padding:10px 6px;}
-.header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;}
-.header h1{margin:0;font-size:28px;}
-.subtle{color:#6b7280;font-size:13px;}
-.case-switch select{padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 18px;}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px;}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
-.card-title{font-weight:600;margin-bottom:10px;}
-.kpi-title{color:#6b7280;font-size:12px;margin-bottom:6px;}
-.kpi-value{font-size:20px;font-weight:700;}
-.kpi-meta{margin-top:6px;color:#6b7280;font-size:12px;}
-.risk.risk-low{border-color:#d1fae5;}
-.risk.risk-med{border-color:#fde68a;}
-.risk.risk-high{border-color:#fecaca;}
-.table-wrap{max-height:330px;overflow:auto;border:1px solid #f3f4f6;border-radius:12px;}
-.table{width:100%;border-collapse:collapse;}
-.table th,.table td{padding:10px 10px;border-bottom:1px solid #f3f4f6;font-size:13px;vertical-align:top;}
-.table th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;}
-.num{text-align:right;}
-.pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;}
-.pill-high{background:#fee2e2;}
-.pill-med{background:#fef3c7;}
-.btn-sm{display:inline-block;padding:6px 10px;border:1px solid #e5e7eb;border-radius:10px;text-decoration:none;}
-.lifecycle .lc-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #f3f4f6;}
-.progress{margin-top:10px;height:10px;background:#f3f4f6;border-radius:999px;overflow:hidden;}
-.progress-bar{height:100%;background:#111827;}
-@media (max-width: 1000px){
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .grid{grid-template-columns:1fr;}
-}
-</style>
 {% endblock %}
