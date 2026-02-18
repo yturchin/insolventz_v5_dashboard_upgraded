@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="bg-white border rounded p-4">
+    <div class="font-semibold">Dedup clusters (with duplicates)</div>
+    <div class="text-sm text-slate-600 mt-1">Top 500 clusters where duplicates were detected.</div>
+  </div>
+
+  <div class="bg-white border rounded p-4 mt-4">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-slate-500">
+          <tr>
+            <th class="py-2">Cluster</th>
+            <th class="py-2">Count</th>
+            <th class="py-2">Duplicates</th>
+            <th class="py-2">Last date</th>
+            <th class="py-2">Canonical</th>
+            <th class="py-2">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clusters %}
+            <tr class="border-t">
+              <td class="py-2">{{ c.cluster_id }}</td>
+              <td class="py-2">{{ c.count }}</td>
+              <td class="py-2">{{ c.duplicates }}</td>
+              <td class="py-2">{{ c.last_date }}</td>
+              <td class="py-2">{% if c.canonical %}{{ c.canonical.creditor_name or c.canonical.recipient_name or '(unknown)' }}{% endif %}</td>
+              <td class="py-2">{% if c.canonical %}{{ c.canonical.amount | round(2) }} {{ c.canonical.currency }}{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

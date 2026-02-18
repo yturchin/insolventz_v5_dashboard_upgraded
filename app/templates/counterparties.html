@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="bg-white border rounded p-4">
+    <div class="flex items-center justify-between">
+      <div class="font-semibold">Counterparties</div>
+      <form method="get" class="flex items-center gap-2">
+        <input name="q" value="{{ filters.q }}" class="border rounded px-2 py-1" placeholder="search name" />
+        <button class="border rounded px-3 py-1 text-sm">Search</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="bg-white border rounded p-4 mt-4">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-slate-500">
+          <tr>
+            <th class="py-2">Name</th>
+            <th class="py-2">Account</th>
+            <th class="py-2">Role</th>
+            <th class="py-2">Related party</th>
+            <th class="py-2">Tx</th>
+            <th class="py-2">Gross</th>
+            <th class="py-2">Net</th>
+            <th class="py-2">Rules hit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr class="border-t">
+              <td class="py-2">{{ r.name }}</td>
+              <td class="py-2 font-mono text-xs">{{ r.account_number }}</td>
+              <td class="py-2">{{ r.role }}</td>
+              <td class="py-2">{{ r.is_related_party }}</td>
+              <td class="py-2">{{ r.tx_count }}</td>
+              <td class="py-2">{{ r.gross_amount | round(2) }}</td>
+              <td class="py-2">{{ r.net_amount | round(2) }}</td>
+              <td class="py-2">{{ r.rules_hit }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

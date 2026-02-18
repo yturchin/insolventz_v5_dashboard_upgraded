@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold">{% if mode == 'new' %}New case{% else %}Edit case{% endif %}</h1>
+      <p class="text-slate-500 text-sm">Case settings are stored in the database and used across all tabs.</p>
+    </div>
+    <a href="/cases" class="text-sm text-slate-600 hover:text-slate-900">← Back to cases</a>
+  </div>
+</div>
+
+<div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm max-w-3xl">
+  {% if mode == 'new' %}
+    <form method="post" action="/cases/new" class="space-y-5">
+  {% else %}
+    <form method="post" action="/cases/{{ case.case_id }}/edit" class="space-y-5">
+  {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium">Case ID</label>
+        {% if mode == 'new' %}
+          <input name="case_id" required placeholder="case_0001" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+          <p class="text-xs text-slate-500 mt-1">Folder will be created under projects/dataroom/cases/&lt;case_id&gt;.</p>
+        {% else %}
+          <div class="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm">{{ case.case_id }}</div>
+        {% endif %}
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Company name</label>
+        <input name="company_name" required value="{% if case %}{{ case.company_name }}{% endif %}" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium">Company accounts</label>
+      <textarea name="accounts_raw" rows="5" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs" placeholder="DE89370400440532013000,EUR\nDE12500105170648489890,EUR">{% if case %}{% for a in case.accounts %}{{ a.account_number }}{% if a.currency %},{{ a.currency }}{% endif %}
+{% endfor %}{% endif %}</textarea>
+      <p class="text-xs text-slate-500 mt-1">One per line. Optional currency after comma.</p>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button class="rounded-lg bg-slate-900 text-white px-4 py-2 text-sm hover:bg-slate-800" type="submit">
+        {% if mode == 'new' %}Create case{% else %}Save changes{% endif %}
+      </button>
+      {% if mode == 'new' %}
+        <a href="/ui/seed_demo" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50">Generate demo instead</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

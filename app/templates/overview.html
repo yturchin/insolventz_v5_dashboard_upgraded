@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Dashboard</h1>
+      <div class="subtle">Case: <strong id="caseLabel">{{ selected_case_id }}</strong></div>
+    </div>
+    <div class="case-switch">
+      <form method="get" action="/">
+        <label for="case_id" class="subtle">Case</label>
+        <select name="case_id" id="case_id" onchange="this.form.submit()">
+          {% for c in cases %}
+            <option value="{{ c.case_id }}" {% if c.case_id == selected_case_id %}selected{% endif %}>{{ c.case_id }} — {{ c.company_name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis">
+    <div class="card kpi">
+      <div class="kpi-title">Total inflows</div>
+      <div class="kpi-value" id="kpiInflows">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-title">Total outflows</div>
+      <div class="kpi-value" id="kpiOutflows">—</div>
+    </div>
+    <div class="card kpi risk" id="kpiSuspiciousCard">
+      <div class="kpi-title">Suspicious amount</div>
+      <div class="kpi-value" id="kpiSuspicious">—</div>
+      <div class="kpi-meta" id="kpiOpenHits">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-title">Coverage</div>
+      <div class="kpi-value" id="kpiCoverage">—</div>
+      <div class="kpi-meta" id="kpiGap">—</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">Monthly cashflow</div>
+      <canvas id="cashflowChart" height="130"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Risk distribution</div>
+      <canvas id="riskChart" height="130"></canvas>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">Suspicious trend</div>
+      <canvas id="susTrendChart" height="130"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Notice lifecycle</div>
+      <div class="lifecycle">
+        <div class="lc-row"><span>Draft</span><span id="lcDraft">0</span></div>
+        <div class="lc-row"><span>Generated</span><span id="lcGenerated">0</span></div>
+        <div class="lc-row"><span>Accepted</span><span id="lcAccepted">0</span></div>
+        <div class="lc-row"><span>Sent</span><span id="lcSent">0</span></div>
+        <div class="progress">
+          <div class="progress-bar" id="lcProgress" style="width:0%"></div>
+        </div>
+        <div class="subtle" style="margin-top:8px;">Manage notices in <a href="/notices">Notices</a>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">Top counterparties</div>
+      <canvas id="cpChart" height="160"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">High-risk transactions</div>
+      <div class="table-wrap">
+        <table class="table" id="riskTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Counterparty</th>
+              <th class="num">Amount</th>
+              <th>Rule</th>
+              <th>Severity</th>
+              <th class="num">Confidence</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="subtle" style="margin-top:8px;">Review all in <a href="/rules">Rules</a>.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const fmtEUR = (v) => {
+  try { return new Intl.NumberFormat(undefined,{style:'currency',currency:'EUR'}).format(v); }
+  catch(e){ return (v||0).toFixed(2) + " EUR"; }
+};
+
+function setRiskColor(cardEl, ratio){
+  cardEl.classList.remove('risk-low','risk-med','risk-high');
+  if (ratio >= 0.15) cardEl.classList.add('risk-high');
+  else if (ratio >= 0.05) cardEl.classList.add('risk-med');
+  else cardEl.classList.add('risk-low');
+}
+
+async function loadDashboard(){
+  const caseId = "{{ selected_case_id }}";
+  const res = await fetch(`/api/dashboard/${caseId}`);
+  if(!res.ok){
+    console.error("Dashboard API error", res.status);
+    return;
+  }
+  const data = await res.json();
+
+  const k = data.kpis;
+  document.getElementById('kpiInflows').innerText = fmtEUR(k.total_inflows);
+  document.getElementById('kpiOutflows').innerText = fmtEUR(Math.abs(k.total_outflows));
+  document.getElementById('kpiSuspicious').innerText = fmtEUR(k.suspicious_amount);
+  document.getElementById('kpiOpenHits').innerText = `${k.open_rule_hits} open rule hits`;
+
+  const cov = k.coverage || {};
+  const covPct = (k.coverage_ratio || 0) * 100;
+  document.getElementById('kpiCoverage').innerText = `${covPct.toFixed(0)}%`;
+  document.getElementById('kpiGap').innerText =
+    (cov.min_date && cov.max_date)
+      ? `${cov.min_date} → ${cov.max_date} • longest gap ${cov.longest_gap_days}d`
+      : `No data`;
+
+  const denom = Math.max(1, Math.abs(k.total_outflows) + k.total_inflows);
+  const suspiciousRatio = (k.suspicious_amount || 0) / denom;
+  setRiskColor(document.getElementById('kpiSuspiciousCard'), suspiciousRatio);
+
+  // Monthly cashflow
+  const months = (data.monthly_cashflow || []).map(x => x.month);
+  const inflows = (data.monthly_cashflow || []).map(x => x.inflows);
+  const outflows = (data.monthly_cashflow || []).map(x => x.outflows);
+
+  new Chart(document.getElementById('cashflowChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        { label: 'Inflows', data: inflows },
+        { label: 'Outflows', data: outflows }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // Risk distribution
+  const r = data.risk_distribution || {};
+  new Chart(document.getElementById('riskChart'), {
+    type: 'pie',
+    data: {
+      labels: ['LOW','REVIEW','HIGH'],
+      datasets: [{ data: [r.LOW||0, r.REVIEW||0, r.HIGH||0] }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // Suspicious trend
+  const sm = (data.suspicious_trend || []).map(x => x.month);
+  const sa = (data.suspicious_trend || []).map(x => x.amount);
+  new Chart(document.getElementById('susTrendChart'), {
+    type: 'line',
+    data: { labels: sm, datasets: [{ label: 'Suspicious amount', data: sa }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // Counterparties
+  const cps = data.top_counterparties || [];
+  new Chart(document.getElementById('cpChart'), {
+    type: 'bar',
+    data: {
+      labels: cps.map(x => x.counterparty),
+      datasets: [{ label: 'Volume', data: cps.map(x => x.volume) }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' }
+  });
+
+  // Lifecycle
+  const lc = data.notice_lifecycle || {};
+  document.getElementById('lcDraft').innerText = lc.Draft || 0;
+  document.getElementById('lcGenerated').innerText = lc.Generated || 0;
+  document.getElementById('lcAccepted').innerText = lc.Accepted || 0;
+  document.getElementById('lcSent').innerText = lc.Sent || 0;
+  const total = (lc.Draft||0)+(lc.Generated||0)+(lc.Accepted||0)+(lc.Sent||0);
+  const done = (lc.Sent||0);
+  const pct = total ? (done/total*100) : 0;
+  document.getElementById('lcProgress').style.width = pct.toFixed(0) + '%';
+
+  // High risk table
+  const tbody = document.querySelector('#riskTable tbody');
+  tbody.innerHTML = '';
+  (data.high_risk || []).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.date || ''}</td>
+      <td>${row.counterparty || ''}</td>
+      <td class="num">${fmtEUR(Math.abs(row.amount||0))}</td>
+      <td>${row.rule_id || ''}</td>
+      <td><span class="pill ${row.severity==='HIGH'?'pill-high':'pill-med'}">${row.severity}</span></td>
+      <td class="num">${(row.confidence||0).toFixed(2)}</td>
+      <td><a class="btn-sm" href="/notices">Create notice</a></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+loadDashboard();
+</script>
+
+<style>
+.page{max-width:1200px;margin:0 auto;padding:10px 6px;}
+.header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;}
+.header h1{margin:0;font-size:28px;}
+.subtle{color:#6b7280;font-size:13px;}
+.case-switch select{padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 18px;}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px;}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
+.card-title{font-weight:600;margin-bottom:10px;}
+.kpi-title{color:#6b7280;font-size:12px;margin-bottom:6px;}
+.kpi-value{font-size:20px;font-weight:700;}
+.kpi-meta{margin-top:6px;color:#6b7280;font-size:12px;}
+.risk.risk-low{border-color:#d1fae5;}
+.risk.risk-med{border-color:#fde68a;}
+.risk.risk-high{border-color:#fecaca;}
+.table-wrap{max-height:330px;overflow:auto;border:1px solid #f3f4f6;border-radius:12px;}
+.table{width:100%;border-collapse:collapse;}
+.table th,.table td{padding:10px 10px;border-bottom:1px solid #f3f4f6;font-size:13px;vertical-align:top;}
+.table th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;}
+.num{text-align:right;}
+.pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;border:1px solid #e5e7eb;}
+.pill-high{background:#fee2e2;}
+.pill-med{background:#fef3c7;}
+.btn-sm{display:inline-block;padding:6px 10px;border:1px solid #e5e7eb;border-radius:10px;text-decoration:none;}
+.lifecycle .lc-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #f3f4f6;}
+.progress{margin-top:10px;height:10px;background:#f3f4f6;border-radius:999px;overflow:hidden;}
+.progress-bar{height:100%;background:#111827;}
+@media (max-width: 1000px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .grid{grid-template-columns:1fr;}
+}
+</style>
+{% endblock %}

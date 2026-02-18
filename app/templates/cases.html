@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold">Cases</h1>
+    <p class="text-slate-500 text-sm">Create, edit and switch investigation cases.</p>
+  </div>
+  <a href="/cases/new" class="inline-flex items-center rounded-lg bg-slate-900 text-white px-4 py-2 text-sm hover:bg-slate-800">+ New case</a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  {% for c in cases %}
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-sm text-slate-500">{{ c.case_id }}</div>
+          <div class="text-lg font-semibold">{{ c.company_name }}</div>
+          <div class="text-xs text-slate-500 mt-1">Created: {{ c.created_at }}</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/ui/set_case/{{ c.case_id }}" class="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-sm">Select</a>
+          <a href="/cases/{{ c.case_id }}/edit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-sm">Edit</a>
+        </div>
+      </div>
+      <div class="mt-4 text-sm">
+        <div class="text-slate-500 mb-1">Accounts</div>
+        <ul class="space-y-1">
+          {% for a in c.accounts %}
+            <li class="flex items-center justify-between">
+              <span class="font-mono text-xs">{{ a.account_number }}</span>
+              <span class="text-xs text-slate-500">{{ a.currency or '' }}</span>
+            </li>
+          {% else %}
+            <li class="text-slate-400">—</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-600">
+      <div class="text-lg font-semibold">No cases yet</div>
+      <div class="text-sm text-slate-500 mt-1">Create a new case or generate demo data.</div>
+      <div class="mt-4 flex items-center justify-center gap-2">
+        <a href="/cases/new" class="rounded-lg bg-slate-900 text-white px-4 py-2 text-sm hover:bg-slate-800">Create case</a>
+        <a href="/ui/seed_demo" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50">Generate demo</a>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

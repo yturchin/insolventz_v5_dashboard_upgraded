@@ -1,0 +1,74 @@
+{% if tx is none %}
+  <div class="text-slate-500 text-sm">Transaction not found.</div>
+{% else %}
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <div class="text-lg font-semibold">Transaction #{{ tx.id }}</div>
+      <div class="text-sm text-slate-600 mt-1">
+        {{ tx.booking_date }} · {{ tx.amount | round(2) }} {{ tx.currency }}
+        {% if tx.is_duplicate %}
+          <span class="ml-2 text-xs bg-amber-100 px-2 py-0.5 rounded">DUPLICATE of {{ tx.duplicate_of }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="text-xs text-slate-500 font-mono">{{ tx.tx_hash }}</div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+    <div class="bg-slate-50 border rounded p-3">
+      <div class="text-xs text-slate-500">Counterparty</div>
+      <div class="font-medium">{{ tx.creditor_name or tx.recipient_name or tx.counterparty_name_raw or '(unknown)' }}</div>
+      <div class="text-xs text-slate-600 mt-1 font-mono">{{ tx.creditor_account_iban or tx.recipient_account or '' }}</div>
+    </div>
+    <div class="bg-slate-50 border rounded p-3">
+      <div class="text-xs text-slate-500">Purpose / Description</div>
+      <div class="text-sm whitespace-pre-wrap">{{ tx.purpose or tx.transaction_description or '' }}</div>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <div class="font-semibold">Rule evaluations</div>
+    <div class="overflow-x-auto mt-2">
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-slate-500">
+          <tr>
+            <th class="py-2">Rule</th>
+            <th class="py-2">Decision</th>
+            <th class="py-2">Confidence</th>
+            <th class="py-2">Lookback</th>
+            <th class="py-2">Explanation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rules %}
+            <tr class="border-t">
+              <td class="py-2">{{ r.rule_id }}</td>
+              <td class="py-2">{{ r.decision }}</td>
+              <td class="py-2">{{ (r.confidence*100) | round(0) }}%</td>
+              <td class="py-2 text-xs">{{ r.lookback_start }} → {{ r.lookback_end }}</td>
+              <td class="py-2 text-xs">{{ r.explanation or '' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <div class="font-semibold">Evidence & conditions</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+      <div class="bg-slate-50 border rounded p-3">
+        <div class="text-xs text-slate-500">System tags</div>
+        <div class="flex flex-wrap gap-1 mt-1">
+          {% for t in tx.system_tags or [] %}<span class="text-xs bg-slate-200 px-2 py-0.5 rounded">{{ t }}</span>{% endfor %}
+        </div>
+      </div>
+      <div class="bg-slate-50 border rounded p-3">
+        <div class="text-xs text-slate-500">User tags</div>
+        <div class="flex flex-wrap gap-1 mt-1">
+          {% for t in tx.user_tags or [] %}<span class="text-xs bg-blue-200 px-2 py-0.5 rounded">{{ t }}</span>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}

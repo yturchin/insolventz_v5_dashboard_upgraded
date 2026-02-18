@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="bg-white border rounded p-4">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <div class="font-semibold">Notice #{{ notice.id }}</div>
+        <div class="text-xs text-slate-500 mt-1">
+          Counterparty: {{ notice.counterparty_name }} · Status: {{ notice.status }}
+        </div>
+        <div class="text-xs text-slate-500 mt-1">
+          File: <a class="underline" href="/files/download?path={{ notice.file_path|urlencode }}">Download PDF</a>
+        </div>
+      </div>
+
+      <form method="post" action="/notices/{{ notice.id }}/status" class="flex items-center gap-2">
+        <select name="status" class="border rounded px-2 py-1 text-sm">
+          <option value="Generated" {% if notice.status == 'Generated' %}selected{% endif %}>Generated</option>
+          <option value="Accepted" {% if notice.status == 'Accepted' %}selected{% endif %}>Accepted</option>
+          <option value="Sent" {% if notice.status == 'Sent' %}selected{% endif %}>Sent</option>
+        </select>
+        <button class="border rounded px-3 py-1 text-sm bg-slate-900 text-white" type="submit">Update status</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="bg-white border rounded p-4 mt-4">
+    <div class="font-semibold">Content</div>
+    <pre class="mt-2 whitespace-pre-wrap text-sm bg-slate-50 border rounded p-3">{{ notice.content }}</pre>
+  </div>
+
+  <div class="bg-white border rounded p-4 mt-4">
+    <div class="font-semibold">Linked transactions</div>
+    <div class="text-xs text-slate-500 mt-1">Open each transaction to review details.</div>
+    <div class="mt-2 flex flex-wrap gap-2">
+      {% for tid in notice.transaction_ids %}
+        <a class="border rounded px-2 py-1 text-sm bg-white hover:bg-slate-50" href="/transactions/{{ tid }}">Tx {{ tid }}</a>
+      {% endfor %}
+      {% if not notice.transaction_ids %}
+        <div class="text-slate-500 text-sm">No transactions linked.</div>
+      {% endif %}
+    </div>
+  </div>
+
+{% endblock %}

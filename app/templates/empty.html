@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div class="text-2xl font-semibold">No cases yet</div>
+    <p class="text-slate-600 mt-2 max-w-2xl">
+      Start by creating a case, then upload bank statements to run parsing → dedup → rules. You can also generate a demo case to smoke-test the pipeline.
+    </p>
+
+    <div class="mt-6 flex flex-wrap gap-2">
+      <a href="/cases/new" class="inline-flex items-center rounded-lg bg-slate-900 text-white px-4 py-2 text-sm hover:bg-slate-800">
+        Create your first case
+      </a>
+      <a href="/ui/seed_demo" class="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50">
+        Generate demo case + statements
+      </a>
+      <a href="/docs" class="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50">
+        Open API docs
+      </a>
+    </div>
+  </div>
+{% endblock %}

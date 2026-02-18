@@ -1,0 +1,76 @@
+<div class="bg-white border rounded">
+  <div class="flex items-center justify-between px-4 py-3">
+    <div class="text-sm text-slate-600">
+      Showing {{ rows|length }} of {{ total }}
+    </div>
+    <div class="text-sm">
+      Page {{ page }} · Size {{ page_size }}
+    </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="text-left text-slate-500 border-t">
+        <tr>
+          <th class="px-4 py-2">Date</th>
+          <th class="px-4 py-2">Amount</th>
+          <th class="px-4 py-2">Counterparty</th>
+          <th class="px-4 py-2">IBAN</th>
+          <th class="px-4 py-2">Purpose</th>
+          <th class="px-4 py-2">Rules</th>
+          <th class="px-4 py-2">Tags</th>
+          <th class="px-4 py-2">Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr class="border-t hover:bg-slate-50 cursor-pointer" hx-get="/transactions/{{ r.id }}" hx-target="#txDetail" hx-swap="innerHTML">
+            <td class="px-4 py-2 whitespace-nowrap">
+              {{ r.booking_date }}
+              {% if r.is_duplicate %}<span class="ml-2 text-xs bg-amber-100 px-2 py-0.5 rounded">DUP</span>{% endif %}
+            </td>
+            <td class="px-4 py-2 whitespace-nowrap">{{ r.amount | round(2) }} {{ r.currency }}</td>
+            <td class="px-4 py-2">{{ r.counterparty }}</td>
+            <td class="px-4 py-2 font-mono text-xs">{{ r.iban }}</td>
+            <td class="px-4 py-2">{{ r.purpose }}</td>
+            <td class="px-4 py-2">
+              <div class="flex flex-wrap gap-1">
+                {% for rr in r.rules %}
+                  {% if rr.decision != 'NO_HIT' %}
+                    <span class="text-xs border rounded px-2 py-0.5">
+                      {{ rr.rule_id }}: {{ rr.decision }} ({{ (rr.confidence*100) | round(0) }}%)
+                    </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </td>
+            <td class="px-4 py-2">
+              <div class="flex flex-wrap gap-1">
+                {% for t in r.system_tags %}<span class="text-xs bg-slate-100 px-2 py-0.5 rounded">{{ t }}</span>{% endfor %}
+                {% for t in r.user_tags %}<span class="text-xs bg-blue-100 px-2 py-0.5 rounded">{{ t }}</span>{% endfor %}
+              </div>
+            </td>
+            <td class="px-4 py-2 text-xs">{{ r.source_file }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex items-center justify-between px-4 py-3 border-t">
+    <button class="border rounded px-3 py-1 text-sm" 
+            hx-get="/transactions/table?page={{ page-1 }}&page_size={{ page_size }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% if filters.include_duplicates %}&include_duplicates=1{% endif %}"
+            hx-target="#txTable" {% if page <= 1 %}disabled{% endif %}>
+      Prev
+    </button>
+    <button class="border rounded px-3 py-1 text-sm" 
+            hx-get="/transactions/table?page={{ page+1 }}&page_size={{ page_size }}&q={{ filters.q }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}{% if filters.include_duplicates %}&include_duplicates=1{% endif %}"
+            hx-target="#txTable" {% if (page*page_size) >= total %}disabled{% endif %}>
+      Next
+    </button>
+  </div>
+</div>
+
+<div class="bg-white border rounded p-4 mt-4" id="txDetail">
+  <div class="text-slate-500 text-sm">Click a transaction to view details.</div>
+</div>

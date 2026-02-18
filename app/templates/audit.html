@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="bg-white border rounded p-4">
+    <div class="flex items-center justify-between">
+      <div class="font-semibold">Audit log</div>
+      <form method="get" class="flex items-center gap-2">
+        <input name="actor" value="{{ filters.actor }}" class="border rounded px-2 py-1" placeholder="actor" />
+        <input name="action" value="{{ filters.action }}" class="border rounded px-2 py-1" placeholder="action" />
+        <select name="entity_type" class="border rounded px-2 py-1">
+          <option value="" {% if not filters.entity_type %}selected{% endif %}>All</option>
+          <option value="case" {% if filters.entity_type=='case' %}selected{% endif %}>case</option>
+          <option value="document" {% if filters.entity_type=='document' %}selected{% endif %}>document</option>
+          <option value="transaction" {% if filters.entity_type=='transaction' %}selected{% endif %}>transaction</option>
+          <option value="notice" {% if filters.entity_type=='notice' %}selected{% endif %}>notice</option>
+          <option value="task" {% if filters.entity_type=='task' %}selected{% endif %}>task</option>
+        </select>
+        <button class="border rounded px-3 py-1 text-sm">Filter</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="bg-white border rounded p-4 mt-4">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-slate-500">
+          <tr>
+            <th class="py-2">Time</th>
+            <th class="py-2">Actor</th>
+            <th class="py-2">Action</th>
+            <th class="py-2">Entity</th>
+            <th class="py-2">Payload</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in rows %}
+            <tr class="border-t">
+              <td class="py-2 text-xs">{{ e.created_at }}</td>
+              <td class="py-2">{{ e.actor or 'system' }}</td>
+              <td class="py-2">{{ e.action }}</td>
+              <td class="py-2 text-xs">{{ e.entity_type }}:{{ e.entity_id }}</td>
+              <td class="py-2 text-xs font-mono whitespace-pre-wrap">{{ e.payload }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

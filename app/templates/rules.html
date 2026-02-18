@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Rules</h1>
+      <div class="subtle">Filter, review and generate notices from selected transactions.</div>
+    </div>
+    <div class="actions">
+      <form method="post" action="/notices/generate_selected" onsubmit="return submitSelected();">
+        <input type="hidden" name="tx_ids" id="tx_ids" value="">
+        <button type="submit" class="btn">Generate notices</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="filters card">
+    <form method="get" action="/rules" class="filter-row">
+      <label>Rule ID <input name="rule_id" value="{{ filters.rule_id }}" placeholder="e.g. §130"></label>
+      <label>Decision
+        <select name="decision">
+          <option value="" {% if not filters.decision %}selected{% endif %}>Any</option>
+          <option value="HIT" {% if filters.decision == "HIT" %}selected{% endif %}>HIT</option>
+          <option value="NEEDS_REVIEW" {% if filters.decision == "NEEDS_REVIEW" %}selected{% endif %}>NEEDS_REVIEW</option>
+          <option value="NO_HIT" {% if filters.decision == "NO_HIT" %}selected{% endif %}>NO_HIT</option>
+        </select>
+      </label>
+      <label>Min conf <input name="min_conf" value="{{ filters.min_conf }}" placeholder="0.50"></label>
+      <button type="submit" class="btn-outline">Apply</button>
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" onclick="toggleAll(this)"></th>
+          <th>Date</th>
+          <th>Counterparty</th>
+          <th class="num">Amount</th>
+          <th>Rule</th>
+          <th>Decision</th>
+          <th class="num">Confidence</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for ev, tx in rows %}
+        <tr>
+          <td><input type="checkbox" class="txcb" value="{{ tx.id }}"></td>
+          <td>{{ tx.booking_date }}</td>
+          <td>{{ tx.creditor_name or tx.debtor_name or "Unknown" }}</td>
+          <td class="num">{{ "%.2f"|format(tx.amount) }}</td>
+          <td>{{ ev.rule_id }}</td>
+          <td>{{ ev.decision }}</td>
+          <td class="num">{{ "%.2f"|format(ev.confidence or 0) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subtle" style="margin-top:10px;">
+    Tip: You can also generate notices from the <a href="/notices">Notices</a> page.
+  </div>
+</div>
+
+<script>
+function selectedIds(){
+  return Array.from(document.querySelectorAll('.txcb:checked')).map(x => x.value);
+}
+function submitSelected(){
+  const ids = selectedIds();
+  document.getElementById('tx_ids').value = ids.join(',');
+  return true;
+}
+function toggleAll(master){
+  document.querySelectorAll('.txcb').forEach(cb => cb.checked = master.checked);
+}
+</script>
+
+<style>
+.page{max-width:1200px;margin:0 auto;padding:10px 6px;}
+.header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:12px;}
+.header h1{margin:0;font-size:26px;}
+.subtle{color:#6b7280;font-size:13px;}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
+.filters{margin-bottom:12px;}
+.filter-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;}
+.filter-row label{display:flex;flex-direction:column;font-size:12px;color:#6b7280;gap:6px;}
+.filter-row input, .filter-row select{padding:8px 10px;border:1px solid #e5e7eb;border-radius:10px;min-width:160px;}
+.btn{padding:10px 14px;border-radius:12px;border:1px solid #111827;background:#111827;color:#fff;cursor:pointer;}
+.btn-outline{padding:10px 14px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;}
+.table-wrap{max-height:640px;overflow:auto;border:1px solid #f3f4f6;border-radius:12px;background:#fff;}
+.table{width:100%;border-collapse:collapse;}
+.table th,.table td{padding:10px 10px;border-bottom:1px solid #f3f4f6;font-size:13px;vertical-align:top;}
+.table th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;}
+.num{text-align:right;}
+</style>
+{% endblock %}

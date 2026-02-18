@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold">Documents</h1>
+    <p class="text-slate-500 text-sm">Upload bank statements and other case documents. Bank statements are processed automatically.</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="lg:col-span-1">
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="font-semibold">Upload</div>
+      <form class="mt-4 space-y-3" method="post" action="/documents/upload" enctype="multipart/form-data">
+        <div>
+          <label class="block text-sm font-medium">Document type</label>
+          <select name="document_type" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+            <option value="bank_statement">Bank statement</option>
+            <option value="creditor_list">List of creditors</option>
+            <option value="other">Other</option>
+          </select>
+          <p class="text-xs text-slate-500 mt-1">Bank statements trigger parsing → dedup → rules in background.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium">File</label>
+          <input name="file" type="file" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 bg-white" />
+          <p class="text-xs text-slate-500 mt-1">Supported: CSV, XLS/XLSX, PDF (text). PDF scans require OCR (optional).</p>
+        </div>
+        <button type="submit" class="w-full rounded-lg bg-slate-900 text-white px-4 py-2 text-sm hover:bg-slate-800">Upload</button>
+      </form>
+
+      <div class="mt-5 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+        Tip: After upload, refresh in a few seconds to see processing status.
+      </div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <div class="font-semibold">Uploaded documents</div>
+          <div class="text-xs text-slate-500">Case: {{ selected_case_id }}</div>
+        </div>
+        <a href="/ui/seed_demo" class="text-sm rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50">Generate demo docs</a>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="text-left px-4 py-3">Type</th>
+              <th class="text-left px-4 py-3">File</th>
+              <th class="text-left px-4 py-3">Status</th>
+              <th class="text-left px-4 py-3">Uploaded</th>
+              <th class="text-left px-4 py-3">Open</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            {% for d in documents %}
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs">{{ d.document_type }}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="font-medium">{{ d.file_name }}</div>
+                  <div class="text-xs text-slate-500 font-mono truncate max-w-[420px]">{{ d.file_path }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  {% if d.processing_status %}
+                    {% set st = d.processing_status %}
+                  {% else %}
+                    {% set st = 'unknown' %}
+                  {% endif %}
+                  <span class="inline-flex items-center rounded-full px-2 py-1 text-xs
+                    {% if st in ['done','ocr_done'] %} bg-emerald-100 text-emerald-800
+                    {% elif st == 'failed' %} bg-rose-100 text-rose-800
+                    {% elif st in ['pending','processing','ocr_running'] %} bg-amber-100 text-amber-800
+                    {% elif st == 'ocr_required' %} bg-indigo-100 text-indigo-800
+                    {% else %} bg-slate-100 text-slate-700 {% endif %}
+                  ">
+                    {{ st }}
+                  </span>
+
+                  {% if st == 'ocr_required' %}
+                    <form method="post" action="/documents/{{ d.id }}/run_ocr" class="mt-2">
+                      <button type="submit" class="text-xs rounded-md bg-indigo-600 text-white px-3 py-1 hover:bg-indigo-500">Run OCR</button>
+                    </form>
+                    <div class="text-xs text-slate-500 mt-1">Requires Poppler + Tesseract on this machine.</div>
+                  {% endif %}
+
+                  {% if st == 'ocr_running' %}
+                    <div class="mt-2">
+                      <div class="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                        <div class="h-2 bg-slate-900" style="width: {{ d.ocr_progress or 0 }}%"></div>
+                      </div>
+                      <div class="text-xs text-slate-500 mt-1">OCR progress: {{ d.ocr_progress or 0 }}%</div>
+                    </div>
+                  {% endif %}
+                  {% if d.processing_error %}
+                    <div class="text-xs text-rose-700 mt-1 truncate max-w-[260px]" title="{{ d.processing_error }}">{{ d.processing_error }}</div>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3 text-xs text-slate-500">{{ d.uploaded_at }}</td>
+                <td class="px-4 py-3">
+                  <a class="text-sm text-slate-700 hover:text-slate-900 underline" href="/api/files/download?path={{ d.file_path | urlencode }}">Open</a>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td class="px-4 py-10 text-center text-slate-500" colspan="5">No documents uploaded yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {% set auto = false %}
+  {% for d in documents %}
+    {% if d.processing_status in ['processing','pending','ocr_running'] %}
+      {% set auto = true %}
+    {% endif %}
+  {% endfor %}
+  {% if auto %}
+    <script>
+      // lightweight progress refresh (no websockets)
+      setTimeout(() => window.location.reload(), 2000);
+    </script>
+  {% endif %}
+{% endblock %}
